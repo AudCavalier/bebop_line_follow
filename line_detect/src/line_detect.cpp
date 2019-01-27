@@ -82,7 +82,10 @@ public:
       }
       //tamaño imagen: height = 480; width = 856
       //Recortamos la imagen a lo largo por conveniencia y facilidad de procesamiento
-      cv_ptr_copy->image = cv_ptr_copy->image(Rect(0, 400, 856, 40));
+      //PARA EFECTOS DE PRUEBAS PERSONALES, RECORTO LA IMAGEN EN x TAMBIÉN
+      //SUPONEMOS CONDICIONES DE LABORATORIO, ES DECIR: PISO BLANCO, LINEA NEGRA
+      //POR LO QUE NO DEBERÍA SER NECESARIO RECORTAR LA IMAGEN EN X
+      cv_ptr_copy->image = cv_ptr_copy->image(Rect(120, 400, 536, 80));
       //valueMask = valueMask(Rect(0, 400, 856, 40));
 
       //EN PRINCIPIO, ES NECESARIO APLICAR FILTROS PARA DETECTAR UNA LINEA NEGRA
@@ -95,12 +98,78 @@ public:
       GaussianBlur(gray, blurr, Size(3, 3), 0, 0);
       //GaussianBlur(valueMask, blurr, Size(3, 3), 0, 0);
       Canny(blurr, edge, 120, 180, 3);
-      HoughLinesP(edge, lines, 1, CV_PI/180, 5, 2, 1);
-
+      HoughLinesP(edge, lines, 1, CV_PI/180, 1, 3, 16);
+      std::vector<Vec4i> pointsVec;
+      int currx1=lines[0][0], currx2;
+      int ymin1=1000, ymin2=1000;
+      int ymax1=0, ymax2=0;
+      int tmp1[2], tmp2[2], tmp3[2], tmp4[2]; //puntos temporales extremos
+      if(lines.size()<3){
+        tmp1[0] = 0;
+        tmp1[1] = 0;
+        tmp2[0] = 0;
+        tmp2[1] = 0;
+        tmp3[0] = 0;
+        tmp3[1] = 0;
+        tmp4[0] = 0;
+        tmp4[1] = 0;
+      }else{
+        for(size_t i=1; i<lines.size(); i++){
+          if(lines[i][0]>currx1+20 || lines[i][0]<=currx1-20){
+            currx2=lines[i][0];
+          }
+        }
+        //std::cout << "X VALUES GOT:\nX1: " << currx1 << " X2: " << currx2 << "\n";
+        //Conseguimos los puntos con extremos superior e inferior
+        for (size_t i=0; i<lines.size(); i++){
+          //std::cout << lines[i][0] << " == " << currx2 << "\n";
+          if(lines[i][0]<=currx1+20 && lines[i][0]>currx1-20){
+            if(lines[i][1]>ymax1){
+              tmp1[0] = lines[i][0];
+              tmp1[1] = lines[i][1];
+              ymax1 = lines[i][1];
+            }
+            if(lines[i][3]<ymin1){
+              tmp2[0] = lines[i][2];
+              tmp2[1] = lines[i][3];
+              ymin1=lines[i][3];
+            }
+          }
+          else if(lines[i][0]<=currx2+20 && lines[i][0]>currx2-20){
+            if(lines[i][1]>ymax2){
+              tmp3[0] = lines[i][0];
+              tmp3[1] = lines[i][1];
+              ymax2 = lines[i][1];
+            }
+            if(lines[i][3]<ymin2){
+              tmp4[0] = lines[i][2];
+              tmp4[1] = lines[i][3];
+              ymin2=lines[i][3];
+            }
+          }
+        }
+      }
+      /*std::cout << "POINTS GOT\n";
+      std::cout << "X1: " << tmp1[0] << " Y1: " << tmp1[1] << "\n";
+      std::cout << "X2: " << tmp2[0] << " Y2: " << tmp2[1] << "\n";
+      std::cout << "X3: " << tmp3[0] << " Y3: " << tmp3[1] << "\n";
+      std::cout << "X4: " << tmp4[0] << " Y4: " << tmp4[1] << "\n";
+      std::cout << "MID: " << (tmp1[0]+tmp3[0])/2 << "\n";*/
+      int linep1[2], linep2[2]; //LA LINEA ACTUAL PARA EL DRONE
+      linep1[0] = (tmp1[0]+tmp3[0])/2;
+      linep1[1] = tmp1[1];
+      linep2[0] = (tmp2[0]+tmp4[0])/2;
+      linep2[1] = tmp4[1];
+      //std::cout << lines.size() << "\n";
       for(size_t i=0; i<lines.size(); i++){
         Vec4i l = lines[i];
-        line(cv_ptr->image(Rect(0, 400, 856, 40)), Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0, 255, 0), 2, 0);
+        line(cv_ptr->image(Rect(120, 400, 536, 80)), Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0, 255, 0), 2, 0);
+        /*std::cout << "FOR i: " << i << "\n";
+        std::cout << "LINE 0 " << l[0] << "  LINE 1 " << l[1] << std::endl;
+        std::cout << "LINE 2 " << l[2] << "  LINE 3 " << l[3] << std::endl;*/
       }
+      line(cv_ptr->image(Rect(120, 400, 536, 80)), Point(linep1[0], linep1[1]), Point(linep2[0], linep2[1]), Scalar(0, 0, 255), 2, 0);
+      
       //cv::imshow(OPENCV_WINDOW, cv_ptr_copy->image);
       cv::imshow(OPENCV_WINDOW, cv_ptr->image);
       
