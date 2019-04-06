@@ -53,28 +53,35 @@ public:
       int y_point = msg.y;
       int x_point = msg.x;
       float pitch = 0.0, yaw = 0.0;
-      std::cout << msg << std::endl;
+      //std::cout << msg << std::endl;
       if(can_move){
         if (y_point>0){
           //std::cout << "MOVVING FORWARD\n";
-          pitch = 0.01;
+          pitch = 0.005;
         }else{
           pitch = 0.0;
         }
         vel_bebop.linear.x = pitch;
-        if (x_point<85 || x_point>115){
+        //Recordatorio personal. angular.z >0 contrario a las manecillas
+        //angular.z <0 en sentido de las manecillas del reloj
+        if (x_point<85){
           //std::cout << "ROTATING\n";
           //detenemos primero el bebop para que gire
           vel_bebop.linear.x = 0;
           vel_bebop.linear.y = 0;
           vel_bebop.linear.z = 0;
           vel_bebop.angular.z = 0.01;
+        }else if(x_point>115){
+          vel_bebop.linear.x = 0;
+          vel_bebop.linear.y = 0;
+          vel_bebop.linear.z = 0;
+          vel_bebop.angular.z = -0.01;
         }else{
-          std::cout << "NOT ROTATING\n";
+          //std::cout << "NOT ROTATING\n";
           vel_bebop.angular.z = 0;
         }
         //std::cout << "Pitch: " << pitch << " Yaw: " << yaw << "\n";
-        //vel_pub.publish(vel_bebop);
+        vel_pub.publish(vel_bebop);
       }
     }
 
@@ -95,12 +102,12 @@ public:
           //std::cout << "KEY: " << get_input << " TAKE OFF\n";
           ROS_INFO("DESPEGANDO...");
           //DESCOMENTAR PARA USAR EL NODO :: TENER PRECAUCIÓN
-          //takeoff_pub.publish(takeoff_msg);
+          takeoff_pub.publish(takeoff_msg);
         }
         if(get_input == 'l'){
           //std::cout << "KEY: " << get_input << " LAND\n";
           ROS_INFO("ATERRIZANDO...");
-          //land_pub.publish(land_msg);
+          land_pub.publish(land_msg);
         }
         if(get_input == 's'){
           //std::cout << "KEY: " << get_input << " LAND\n";
@@ -129,9 +136,9 @@ int main(int argc, char** argv){
   //ESTO LO HAGO PARA TRABAJAR SIN TENER QUE TENER EL BEBOP PRENDIDO TODO EL TIEMPO
   std::cout << "Menú:\nPresionar 't' para despegar\nPresionar 'l' para aterrizar\n";
   std::cout << "Presionar 's' para iniciar/terminar (el drone debe estár en el aire)\nPresionar 'esc' para salir\n";
-  //takeoff_pub = nh_.advertise<std_msgs::Empty>("/bebop/takeoff", 1000);
-  //land_pub = nh_.advertise<std_msgs::Empty>("/bebop/land", 1000);
-  //vel_pub = nh_.advertise<geometry_msgs::Twist>("/bebop/cmd_vel", 1000);
+  takeoff_pub = nh_.advertise<std_msgs::Empty>("/bebop/takeoff", 1000);
+  land_pub = nh_.advertise<std_msgs::Empty>("/bebop/land", 1000);
+  vel_pub = nh_.advertise<geometry_msgs::Twist>("/bebop/cmd_vel", 1000);
   while(nh_.ok()){
     ros::spinOnce();
     if(end_flag){
