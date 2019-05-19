@@ -62,15 +62,21 @@ public:
       img = img(Rect(308, 400, 200, 80));
       //HSV
       cvtColor(img, hsvImg, CV_BGR2HSV);
-      split(hsvImg, hsvChannels);
+      //img = 255-img;
+      //cvtColor(img, hsvImg, CV_BGR2GRAY);
+      //hsvImg = 255-hsvImg;
+      //threshold(hsvImg, processed_img, 180, 255, THRESH_BINARY_INV);
+
+      //split(hsvImg, hsvChannels);
       //Para un rango de negro* (Este valor lo calculé para la imagen que tengo, puede no servir, pero se puede ajustar)
-      inRange(hsvImg, Scalar(0, 0, 0), Scalar(230, 220, 210), valueMask);
+      inRange(hsvImg, Scalar(0, 0, 0), Scalar(180, 255, 255), valueMask);
       //bitwise_img
+      
       bitwise_and(img, img, processed_img, valueMask);
       //Convirtiendo la imagen a escala de grises
-      cvtColor(processed_img, gray, CV_BGR2GRAY);
+      //cvtColor(processed_img, gray, CV_BGR2GRAY);
       //Aplicando filtro gaussiano
-      GaussianBlur(gray, blurr, Size(3, 3), 0, 0);
+      GaussianBlur(processed_img, blurr, Size(3, 3), 0, 0);
       //GaussianBlur(valueMask, blurr, Size(3, 3), 0, 0);
       //Detectando bordes con Canny
       Canny(blurr, edge, 120, 180, 3);
@@ -78,7 +84,7 @@ public:
       findContours(edge, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 
       //HOUGH
-      HoughLinesP(edge, lines, 1, CV_PI/180, 1, 3, 16);
+      //HoughLinesP(edge, lines, 1, CV_PI/180, 1, 3, 16);
       //value mask
       //Mat valueChannel = hsvChannels[2];
       //Mat hueMask, saturationMask, valueMask;
@@ -100,14 +106,15 @@ public:
       }
       mid_pos.x = (center.x+x2)/2;
       mid_pos.y = (center.y+y2)/2;
-      /*std::cout<<"DETECTED CENTER:";
-      std::cout<<center<<std::endl;
-      std::cout<<"CALCULATED ONE:";
-      std::cout<<Point(x1, y1)<<std::endl;
-      std::cout<<"CALCULATED TWO:";
-      std::cout<<Point(x2, y2)<<std::endl;*/
-      circle(processed_img, Point((center.x+x2)/2, (center.y+y2)/2), 5, (255, 255, 200), 2);
-      //circle(img, Point(x2, y2), 5, (0, 0, 255), 1);
+      //std::cout<<"DETECTED CENTER:";
+      //std::cout<<center<<std::endl;
+      //std::cout<<"CALCULATED ONE:";
+      //std::cout<<Point(x1, y1)<<std::endl;
+      //std::cout<<"CALCULATED TWO:";
+      //std::cout<<Point(x2, y2)<<std::endl;
+      //std::cout<< "WIDTH : " << processed_img.cols << " HEIGHT: " << processed_img.rows << "\n";
+      circle(processed_img, Point((center.x+x2)/2, (center.y+y2)/2), 5, (0, 255, 200), 2);
+      circle(img, Point(x2, y2), 5, (0, 0, 255), 1);
       line_pos.publish(mid_pos);
       //std::cout << processed_img.cols << std::endl;
       cv::imshow(OPENCV_WINDOW, draw);

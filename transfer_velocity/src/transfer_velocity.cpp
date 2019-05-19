@@ -54,35 +54,46 @@ public:
       int x_point = msg.x;
       float pitch = 0.0, yaw = 0.0;
       //std::cout << msg << std::endl;
-      if(can_move){
+      if(can_move){ 
         if (y_point>0){
-          //std::cout << "MOVVING FORWARD\n";
-          pitch = 0.005;
+          //std::cout << "MOVING FORWARD\n";
+          pitch = 0.05;
         }else{
           pitch = 0.0;
         }
         vel_bebop.linear.x = pitch;
         //Recordatorio personal. angular.z >0 contrario a las manecillas
         //angular.z <0 en sentido de las manecillas del reloj
-        if (x_point<85){
+        if (x_point<25){
           //std::cout << "ROTATING\n";
           //detenemos primero el bebop para que gire
           vel_bebop.linear.x = 0;
-          vel_bebop.linear.y = 0;
-          vel_bebop.linear.z = 0;
-          vel_bebop.angular.z = 0.01;
-        }else if(x_point>115){
+          //vel_bebop.linear.y = 0;
+          //vel_bebop.linear.z = 0;
+          vel_bebop.angular.z = 0.3;
+        }else if(x_point>55){
           vel_bebop.linear.x = 0;
-          vel_bebop.linear.y = 0;
-          vel_bebop.linear.z = 0;
-          vel_bebop.angular.z = -0.01;
+          //vel_bebop.linear.y = 0;
+          //vel_bebop.linear.z = 0;
+          vel_bebop.angular.z = -0.3;
         }else{
-          //std::cout << "NOT ROTATING\n";
-          vel_bebop.angular.z = 0;
+          vel_bebop.angular.z = 0.0;
         }
+        //std::cout << "inb4" << "\n";
+        std::cout << "NOT ROTATING: X VEL: " << vel_bebop.linear.x << "\n Y VEL: " <<  vel_bebop.linear.y;
+        std::cout << " Z VEL: " << vel_bebop.linear.z << " ANGULAR: ";
+        std::cout << vel_bebop.angular.z << "\n";
+        //vel_bebop.angular.z = 0;
         //std::cout << "Pitch: " << pitch << " Yaw: " << yaw << "\n";
         vel_pub.publish(vel_bebop);
       }
+      else{
+        vel_bebop.linear.x = 0;
+        vel_bebop.linear.y = 0;
+        vel_bebop.linear.z = 0;
+        vel_bebop.angular.z = 0;
+        vel_pub.publish(vel_bebop);
+     }
     }
 
     void chatterCallback(const geometry_msgs::Point &msg){
