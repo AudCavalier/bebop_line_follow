@@ -11,8 +11,8 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
-#include <Eigen/Core>
-#include <Eigen/Geometry>
+#include <eigen3/Eigen/Core>
+#include <eigen3/Eigen/Geometry>
 #include <iostream>
 #include <stdlib.h>
 
@@ -53,25 +53,27 @@ public:
       int y_point = msg.y;
       int x_point = msg.x;
       float pitch = 0.0, yaw = 0.0;
-      //std::cout << msg << std::endl;
+      //std::cout << "DEBUG MSG : ==================== " << msg << std::endl;
+      //std::cout << "DEBUG: X POINT: " << x_point << " Y POINT: " << y_point << "\n";
       if(can_move){ 
         if (y_point>0){
-          //std::cout << "MOVING FORWARD\n";
-          pitch = 0.05;
+          std::cout << "MOVING FORWARD\n";
+          pitch = 0.03;
         }else{
           pitch = 0.0;
         }
         vel_bebop.linear.x = pitch;
         //Recordatorio personal. angular.z >0 contrario a las manecillas
         //angular.z <0 en sentido de las manecillas del reloj
-        if (x_point<25){
+
+        if (x_point<50){
           //std::cout << "ROTATING\n";
           //detenemos primero el bebop para que gire
           vel_bebop.linear.x = 0;
           //vel_bebop.linear.y = 0;
           //vel_bebop.linear.z = 0;
           vel_bebop.angular.z = 0.3;
-        }else if(x_point>55){
+        }else if(x_point>150){
           vel_bebop.linear.x = 0;
           //vel_bebop.linear.y = 0;
           //vel_bebop.linear.z = 0;
@@ -80,9 +82,9 @@ public:
           vel_bebop.angular.z = 0.0;
         }
         //std::cout << "inb4" << "\n";
-        std::cout << "NOT ROTATING: X VEL: " << vel_bebop.linear.x << "\n Y VEL: " <<  vel_bebop.linear.y;
+        //std::cout << "NOT ROTATING: X VEL: " << vel_bebop.linear.x << "\n Y VEL: " <<  vel_bebop.linear.y;
         std::cout << " Z VEL: " << vel_bebop.linear.z << " ANGULAR: ";
-        std::cout << vel_bebop.angular.z << "\n";
+        //std::cout << vel_bebop.angular.z << "\n";
         //vel_bebop.angular.z = 0;
         //std::cout << "Pitch: " << pitch << " Yaw: " << yaw << "\n";
         vel_pub.publish(vel_bebop);

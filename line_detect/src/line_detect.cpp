@@ -10,8 +10,8 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
-#include <Eigen/Core>
-#include <Eigen/Geometry>
+#include <eigen3/Eigen/Core>
+#include <eigen3/Eigen/Geometry>
 #include <iostream>
 #include <stdlib.h>
 
@@ -57,7 +57,8 @@ public:
       geometry_msgs::Point mid_pos;
       float radius;
       float x1=img.cols/2, y1=img.rows+1, x2=img.cols/2, y2=-1.0;
-
+      mid_pos.x= 0;
+      mid_pos.y = 0;
       //Recortamos la imagen para conseguir la región de interes
       img = img(Rect(308, 400, 200, 80));
       //HSV
@@ -91,30 +92,32 @@ public:
       
       //DRAW CONTOURS:
       Mat draw = Mat::zeros(edge.size(), CV_8UC3);
-      for(int i=0; i<contours.size(); i++){
-        minEnclosingCircle(contours[i], center, radius);
-        if(center.y<y1){
-          y1=center.y;
-          x1=center.x;
+      if(contours.size() > 0){
+        for(int i=0; i<contours.size(); i++){
+          minEnclosingCircle(contours[i], center, radius);
+          if(center.y<y1){
+            y1=center.y;
+            x1=center.x;
+          }
+          if(center.y>y2){
+            y2=center.y;
+            x2=center.x;
+          }
+          Scalar color = Scalar(rng.uniform(0, 255), rng.uniform(0, 255), rng.uniform(0, 255));
+          drawContours(draw, contours, i, color, 2, 8, hierarchy, 0, Point());
         }
-        if(center.y>y2){
-          y2=center.y;
-          x2=center.x;
-        }
-        Scalar color = Scalar(rng.uniform(0, 255), rng.uniform(0, 255), rng.uniform(0, 255));
-        drawContours(draw, contours, i, color, 2, 8, hierarchy, 0, Point());
+        mid_pos.x = (center.x+x2)/2;
+        mid_pos.y = (center.y+y2)/2;
+        //std::cout<<"DETECTED CENTER:";
+        //std::cout<<center<<std::endl;
+        //std::cout<<"CALCULATED ONE:";
+        //std::cout<<Point(x1, y1)<<std::endl;
+        //std::cout<<"CALCULATED TWO:";
+        //std::cout<<Point(x2, y2)<<std::endl;
+        //std::cout<< "WIDTH : " << processed_img.cols << " HEIGHT: " << processed_img.rows << "\n";
+        circle(processed_img, Point((center.x+x2)/2, (center.y+y2)/2), 5, (0, 255, 200), 2);
+        circle(img, Point(x2, y2), 5, (0, 0, 255), 1);
       }
-      mid_pos.x = (center.x+x2)/2;
-      mid_pos.y = (center.y+y2)/2;
-      //std::cout<<"DETECTED CENTER:";
-      //std::cout<<center<<std::endl;
-      //std::cout<<"CALCULATED ONE:";
-      //std::cout<<Point(x1, y1)<<std::endl;
-      //std::cout<<"CALCULATED TWO:";
-      //std::cout<<Point(x2, y2)<<std::endl;
-      //std::cout<< "WIDTH : " << processed_img.cols << " HEIGHT: " << processed_img.rows << "\n";
-      circle(processed_img, Point((center.x+x2)/2, (center.y+y2)/2), 5, (0, 255, 200), 2);
-      circle(img, Point(x2, y2), 5, (0, 0, 255), 1);
       line_pos.publish(mid_pos);
       //std::cout << processed_img.cols << std::endl;
       cv::imshow(OPENCV_WINDOW, draw);
