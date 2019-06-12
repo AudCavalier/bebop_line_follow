@@ -23,9 +23,11 @@ using namespace std;
 using namespace Eigen;
 
 geometry_msgs::Twist msg;
+geometry_msgs::Twist camera_msg;
 cv_bridge::CvImagePtr cv_ptr;
 
 ros::Publisher line_pos;
+ros::Publisher camera_pub; //tópico para despegar
 
 RNG rng(12345);
 int line_exists_flag;
@@ -48,6 +50,8 @@ public:
     }
 
     void detect_line(cv::Mat& img){
+      camera_msg.angular.y = -30;
+      camera_pub.publish(camera_msg);
       Mat processed_img;
       vector<Mat> hsvChannels;
       vector<vector<Point> > contours;
@@ -69,7 +73,6 @@ public:
       //threshold(hsvImg, processed_img, 180, 255, THRESH_BINARY_INV);
 
       //split(hsvImg, hsvChannels);
-      //Para un rango de negro* (Este valor lo calculé para la imagen que tengo, puede no servir, pero se puede ajustar)
       inRange(hsvImg, Scalar(0, 0, 0), Scalar(180, 255, 255), valueMask);
       //bitwise_img
       
@@ -149,9 +152,10 @@ int main(int argc, char** argv){
   image_transport::Subscriber image_sub_;
   ImageProcess ip;
   image_sub_ = it_.subscribe("/bebop/image_raw", 1, &ImageProcess::imageCallback, &ip);
+  camera_pub = nh_.advertise<geometry_msgs::Twist>("/bebop/camera_control", 1000);
   //ESTO LO HAGO PARA TRABAJAR SIN TENER QUE TENER EL BEBOP PRENDIDO TODO EL TIEMPO
   //image_sub_ = it_.subscribe("/camera/image", 1, &ImageProcess::imageCallback, &ip);
-  
+
   while(nh_.ok()){
     ros::spinOnce();
     if(end_flag){

@@ -53,12 +53,12 @@ public:
       int y_point = msg.y;
       int x_point = msg.x;
       float pitch = 0.0, yaw = 0.0;
-      //std::cout << "DEBUG MSG : ==================== " << msg << std::endl;
-      //std::cout << "DEBUG: X POINT: " << x_point << " Y POINT: " << y_point << "\n";
+      std::cout << "DEBUG MSG : ==================== " << msg << std::endl;
+      std::cout << "DEBUG: X POINT: " << x_point << " Y POINT: " << y_point << "\n";
       if(can_move){ 
         if (y_point>0){
           std::cout << "MOVING FORWARD\n";
-          pitch = 0.03;
+          pitch = 0.04;
         }else{
           pitch = 0.0;
         }
@@ -66,23 +66,29 @@ public:
         //Recordatorio personal. angular.z >0 contrario a las manecillas
         //angular.z <0 en sentido de las manecillas del reloj
 
-        if (x_point<50){
+        if (x_point==0){
+          vel_bebop.linear.x = 0;
+          //vel_bebop.linear.y = 0;
+          //vel_bebop.linear.z = 0;
+          vel_bebop.angular.z = 0;
+        }
+        else if (x_point<50){
           //std::cout << "ROTATING\n";
           //detenemos primero el bebop para que gire
           vel_bebop.linear.x = 0;
           //vel_bebop.linear.y = 0;
           //vel_bebop.linear.z = 0;
-          vel_bebop.angular.z = 0.3;
+          vel_bebop.angular.z = 0.15;
         }else if(x_point>150){
           vel_bebop.linear.x = 0;
           //vel_bebop.linear.y = 0;
           //vel_bebop.linear.z = 0;
-          vel_bebop.angular.z = -0.3;
+          vel_bebop.angular.z = -0.15;
         }else{
           vel_bebop.angular.z = 0.0;
         }
-        //std::cout << "inb4" << "\n";
-        //std::cout << "NOT ROTATING: X VEL: " << vel_bebop.linear.x << "\n Y VEL: " <<  vel_bebop.linear.y;
+        std::cout << "inb4" << "\n";
+        std::cout << "NOT ROTATING: X VEL: " << vel_bebop.linear.x << "\n Y VEL: " <<  vel_bebop.linear.y;
         std::cout << " Z VEL: " << vel_bebop.linear.z << " ANGULAR: ";
         //std::cout << vel_bebop.angular.z << "\n";
         //vel_bebop.angular.z = 0;
