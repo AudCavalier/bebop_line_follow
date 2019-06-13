@@ -22,16 +22,21 @@ using namespace Eigen;
 
 static const std::string FAKE_WINDOW = "Fake window";
 
+cv_bridge::CvImagePtr cv_ptr;
+
 std_msgs::Empty takeoff_msg, land_msg;
 geometry_msgs::Twist vel_bebop;
 
 ros::Publisher takeoff_pub; //tópico para despegar
 ros::Publisher land_pub; //tópico para aterrizar
 ros::Publisher vel_pub; //tópico para mover el bebop
-ros::Subscriber sub; //para subscribirse al tópico del punto 
+ros::Subscriber sub; //para subscribirse al tópico del punto
+ros::Subscriber img;
 
+Point2f bebop_center;
 bool end_flag = false;
 int can_move = 0; //variable para indicar que el bebop empezará a moverse(1) o no (0)
+
 class VelocityHandle{  
 public:
   VelocityHandle(){
@@ -46,6 +51,28 @@ public:
       //De-constructor
     }
 
+    void calccenter(cv::Mat& img){
+      Point2f img_center;
+      img_center.x = img.cols/2;
+      img_center.y = img.rows/2;
+      bebop_center = img_center;
+    }
+    void turn(){
+      std::cout << "DEBUG : : TURNING : :\n";
+      vel_bebop.linear.x = 0;
+      vel_bebop.linear.y = 0;
+      vel_bebop.linear.z = 0;
+      vel_pub.publish(vel_bebop);
+    }
+
+    void hover(){
+      vel_bebop.linear.x = 0;
+      vel_bebop.linear.y = 0;
+      vel_bebop.linear.z = 0;
+      vel_bebop.angular.z = 0;
+      vel_pub.publish(vel_bebop);
+    }
+
     void velHandle(const geometry_msgs::Point &msg){
       //Si Point.y >0 MOVER, si no DETENER
       //Si Point.x >width/2+20 || Point.x < width/2-20 -> girar, si no, no girar
@@ -55,52 +82,38 @@ public:
       float pitch = 0.0, yaw = 0.0;
       std::cout << "DEBUG MSG : ==================== " << msg << std::endl;
       std::cout << "DEBUG: X POINT: " << x_point << " Y POINT: " << y_point << "\n";
-      if(can_move){ 
-        if (y_point>0){
-          std::cout << "MOVING FORWARD\n";
-          pitch = 0.04;
-        }else{
-          pitch = 0.0;
+      if(can_move){
+        if(x_point>=0 &&  y_point>=0){
+          //Recordatorio personal. angular.z >0 contrario a las manecillas
+          //angular.z <0 en sentido de las manecillas del reloj
+          if(x_point < bebop_center.x){
+            vel_bebop.angular.z = 0.3;
+            turn();
+          }
+          if(x_point > bebop_center.x){
+            vel_bebop.angular.z = -0.3;
+            turn();
+          }
+          if(y_point > bebop_center.y){
+            std::cout << "MOVING FORWARD\n";
+            pitch = -0.05;
+          }
+          if(y_point < bebop_center.y){
+            pitch = 0.05;
+          }
+          //std::cout << "inb4" << "\n";
+          std::cout << "NOT ROTATING: X VEL: " << vel_bebop.linear.x << "\n Y VEL: " <<  vel_bebop.linear.y;
+          std::cout << " Z VEL: " << vel_bebop.linear.z << " ANGULAR: ";
+          std::cout << vel_bebop.angular.z << "\n";
+          //vel_bebop.angular.z = 0;
+          //std::cout << "Pitch: " << pitch << " Yaw: " << yaw << "\n";
         }
         vel_bebop.linear.x = pitch;
-        //Recordatorio personal. angular.z >0 contrario a las manecillas
-        //angular.z <0 en sentido de las manecillas del reloj
-
-        if (x_point==0){
-          vel_bebop.linear.x = 0;
-          //vel_bebop.linear.y = 0;
-          //vel_bebop.linear.z = 0;
-          vel_bebop.angular.z = 0;
-        }
-        else if (x_point<50){
-          //std::cout << "ROTATING\n";
-          //detenemos primero el bebop para que gire
-          vel_bebop.linear.x = 0;
-          //vel_bebop.linear.y = 0;
-          //vel_bebop.linear.z = 0;
-          vel_bebop.angular.z = 0.15;
-        }else if(x_point>150){
-          vel_bebop.linear.x = 0;
-          //vel_bebop.linear.y = 0;
-          //vel_bebop.linear.z = 0;
-          vel_bebop.angular.z = -0.15;
-        }else{
-          vel_bebop.angular.z = 0.0;
-        }
-        std::cout << "inb4" << "\n";
-        std::cout << "NOT ROTATING: X VEL: " << vel_bebop.linear.x << "\n Y VEL: " <<  vel_bebop.linear.y;
-        std::cout << " Z VEL: " << vel_bebop.linear.z << " ANGULAR: ";
-        //std::cout << vel_bebop.angular.z << "\n";
-        //vel_bebop.angular.z = 0;
-        //std::cout << "Pitch: " << pitch << " Yaw: " << yaw << "\n";
+        vel_bebop.angular.z = 0.0;  
         vel_pub.publish(vel_bebop);
       }
       else{
-        vel_bebop.linear.x = 0;
-        vel_bebop.linear.y = 0;
-        vel_bebop.linear.z = 0;
-        vel_bebop.angular.z = 0;
-        vel_pub.publish(vel_bebop);
+        hover();
      }
     }
 
@@ -111,6 +124,9 @@ public:
     void fakeimgCallback(const sensor_msgs::ImageConstPtr &msg){
       //Este método es simplemente para poder acceder al teclado con cv::waitKey
       try{
+        cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+        cv::Mat img_copy = cv_ptr->image.clone();
+        calccenter(img_copy);
         cv::Mat1f Fake_img(1, 1, 0.0f);
         cv::imshow(FAKE_WINDOW, Fake_img);
         int get_input = cv::waitKey(30);
@@ -151,7 +167,7 @@ int main(int argc, char** argv){
   image_transport::Subscriber fake_image_sub_;
   VelocityHandle vh;
   //fake_image_sub_ = it_.subscribe("/camera/image", 1, &VelocityHandle::fakeimgCallback, &vh);
-  fake_image_sub_ = it_.subscribe("/bebop/image_raw", 1, &VelocityHandle::fakeimgCallback, &vh);
+  fake_image_sub_ = it_.subscribe("Processed_image", 1, &VelocityHandle::fakeimgCallback, &vh);
   //ESTO LO HAGO PARA TRABAJAR SIN TENER QUE TENER EL BEBOP PRENDIDO TODO EL TIEMPO
   std::cout << "Menú:\nPresionar 't' para despegar\nPresionar 'l' para aterrizar\n";
   std::cout << "Presionar 's' para iniciar/terminar (el drone debe estár en el aire)\nPresionar 'esc' para salir\n";

@@ -17,6 +17,7 @@
 
 static const std::string OPENCV_WINDOW = "Image window";
 static const std::string OPENCV_BIN = "Binary Image";
+static const std::string OPENCV_TEST = "Image";
 
 using namespace cv;
 using namespace std;
@@ -27,7 +28,8 @@ geometry_msgs::Twist camera_msg;
 cv_bridge::CvImagePtr cv_ptr;
 
 ros::Publisher line_pos;
-ros::Publisher camera_pub; //tópico para despegar
+//ros::Publisher camera_pub;
+image_transport::Publisher camera_pub;
 
 RNG rng(12345);
 int line_exists_flag;
@@ -43,7 +45,9 @@ class ImageProcess{
 public:
     ImageProcess(){
       ros::NodeHandle n;
+      image_transport::ImageTransport it(n);
       line_pos=n.advertise<geometry_msgs::Point>("Line_position", 1000);
+      camera_pub = it.advertise("Processed_image", 1);
     }
     ~ImageProcess(){
       cv::destroyAllWindows();
@@ -51,7 +55,7 @@ public:
 
     void detect_line(cv::Mat& img){
       camera_msg.angular.y = -30;
-      camera_pub.publish(camera_msg);
+      //camera_pub.publish(camera_msg);
       Mat processed_img;
       vector<Mat> hsvChannels;
       vector<vector<Point> > contours;
@@ -66,17 +70,21 @@ public:
       //Recortamos la imagen para conseguir la región de interes
       img = img(Rect(308, 400, 200, 80));
       //HSV
-      cvtColor(img, hsvImg, CV_BGR2HSV);
+      cvtColor(img, hsvImg, CV_BGR2RGB);
+      hsvImg = 255-hsvImg;
+      cvtColor(hsvImg, hsvImg, CV_RGB2BGR);
+      cvtColor(hsvImg, hsvImg, CV_BGR2HSV);
       //img = 255-img;
       //cvtColor(img, hsvImg, CV_BGR2GRAY);
-      //hsvImg = 255-hsvImg;
+      
       //threshold(hsvImg, processed_img, 180, 255, THRESH_BINARY_INV);
-
+      
       //split(hsvImg, hsvChannels);
       inRange(hsvImg, Scalar(0, 0, 0), Scalar(180, 255, 255), valueMask);
       //bitwise_img
       
       bitwise_and(img, img, processed_img, valueMask);
+      
       //Convirtiendo la imagen a escala de grises
       //cvtColor(processed_img, gray, CV_BGR2GRAY);
       //Aplicando filtro gaussiano
@@ -122,7 +130,14 @@ public:
         circle(img, Point(x2, y2), 5, (0, 0, 255), 1);
       }
       line_pos.publish(mid_pos);
+      cv_bridge::CvImage img_bridge;
+      sensor_msgs::Image img_msg;
+      std_msgs::Header header;
+      img_bridge = cv_bridge::CvImage(header, sensor_msgs::image_encodings::RGB8, processed_img);
+      img_bridge.toImageMsg(img_msg);
+      camera_pub.publish(img_msg);
       //std::cout << processed_img.cols << std::endl;
+      //cv::imshow(OPENCV_TEST, img);
       cv::imshow(OPENCV_WINDOW, draw);
       cv::imshow(OPENCV_BIN, processed_img);
     }
@@ -151,10 +166,9 @@ int main(int argc, char** argv){
   image_transport::ImageTransport it_(nh_);
   image_transport::Subscriber image_sub_;
   ImageProcess ip;
-  image_sub_ = it_.subscribe("/bebop/image_raw", 1, &ImageProcess::imageCallback, &ip);
-  camera_pub = nh_.advertise<geometry_msgs::Twist>("/bebop/camera_control", 1000);
+  //image_sub_ = it_.subscribe("/bebop/image_raw", 1, &ImageProcess::imageCallback, &ip);
   //ESTO LO HAGO PARA TRABAJAR SIN TENER QUE TENER EL BEBOP PRENDIDO TODO EL TIEMPO
-  //image_sub_ = it_.subscribe("/camera/image", 1, &ImageProcess::imageCallback, &ip);
+  image_sub_ = it_.subscribe("/camera/image", 1, &ImageProcess::imageCallback, &ip);
 
   while(nh_.ok()){
     ros::spinOnce();
