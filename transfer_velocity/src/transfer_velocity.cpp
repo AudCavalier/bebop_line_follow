@@ -57,13 +57,6 @@ public:
       img_center.y = img.rows/2;
       bebop_center = img_center;
     }
-    void turn(){
-      std::cout << "DEBUG : : TURNING : :\n";
-      vel_bebop.linear.x = 0;
-      vel_bebop.linear.y = 0;
-      vel_bebop.linear.z = 0;
-      vel_pub.publish(vel_bebop);
-    }
 
     void hover(){
       vel_bebop.linear.x = 0;
@@ -74,9 +67,6 @@ public:
     }
 
     void velHandle(const geometry_msgs::Point &msg){
-      //Si Point.y >0 MOVER, si no DETENER
-      //Si Point.x >width/2+20 || Point.x < width/2-20 -> girar, si no, no girar
-      //std::cout << "OK\n";
       int y_point = msg.y;
       int x_point = msg.x;
       float pitch = 0.0, yaw = 0.0;
@@ -86,31 +76,56 @@ public:
         if(x_point>=0 &&  y_point>=0){
           //Recordatorio personal. angular.z >0 contrario a las manecillas
           //angular.z <0 en sentido de las manecillas del reloj
-          if(x_point < bebop_center.x){
-            vel_bebop.angular.z = 0.3;
-            turn();
+          if(x_point < bebop_center.x-75){
+            if(y_point>bebop_center.y-5 && y_point < bebop_center.y+5){
+              std::cout << "DEBUG : : MOVING LEFT : :" << "\n";//x_point << " :: " << bebop_center << "\n";
+              vel_bebop.linear.x = 0;
+              vel_bebop.linear.y = 0.02;
+              vel_bebop.linear.z = 0;
+              vel_bebop.angular.z = 0.0;
+            }else{
+              std::cout << "DEBUG : : TURNING LEFT : :" << x_point << " :: " << bebop_center << "\n";
+              vel_bebop.linear.x = 0;
+              vel_bebop.linear.y = 0;
+              vel_bebop.linear.z = 0;
+              vel_bebop.angular.z = 0.1;
+            }
           }
-          if(x_point > bebop_center.x){
-            vel_bebop.angular.z = -0.3;
-            turn();
+          else if(x_point > bebop_center.x+75){
+             if(y_point>bebop_center.y-5 && y_point < bebop_center.y+5){
+              std::cout << "DEBUG : : MOVING RIGHT : :" << "\n";//x_point << " :: " << bebop_center << "\n";
+              vel_bebop.linear.x = 0;
+              vel_bebop.linear.y = -0.02;
+              vel_bebop.linear.z = 0;
+              vel_bebop.angular.z = 0.0;
+            }else{
+              std::cout << "DEBUG : : TURNING RIGHT : :" << x_point << " :: " << bebop_center << "\n";
+              vel_bebop.linear.x = 0;
+              vel_bebop.linear.y = 0;
+              vel_bebop.linear.z = 0;
+              vel_bebop.angular.z = -0.1;
+            }
           }
-          if(y_point > bebop_center.y){
-            std::cout << "MOVING FORWARD\n";
-            pitch = -0.05;
+          else if(y_point > bebop_center.y-(bebop_center.y/4)){
+            std::cout << "MOVING FORWARD";
+            std::cout << " X VEL: " << vel_bebop.linear.x << "\n Y VEL: " <<  vel_bebop.linear.y;
+            std::cout << " Z VEL: " << vel_bebop.linear.z << " ANGULAR: ";
+            std::cout << vel_bebop.angular.z << "\n";
+            vel_bebop.linear.y = 0.0;
+            vel_bebop.angular.z = 0.0;  
+            pitch = 0.018;
+          }else{
+            std::cout << "STANDING STILL\n";
+            vel_bebop.linear.x = 0;
+            vel_bebop.linear.y = 0;
+            vel_bebop.linear.z = 0;
+            vel_bebop.angular.z = 0;
           }
-          if(y_point < bebop_center.y){
-            pitch = 0.05;
-          }
-          //std::cout << "inb4" << "\n";
-          std::cout << "NOT ROTATING: X VEL: " << vel_bebop.linear.x << "\n Y VEL: " <<  vel_bebop.linear.y;
-          std::cout << " Z VEL: " << vel_bebop.linear.z << " ANGULAR: ";
-          std::cout << vel_bebop.angular.z << "\n";
           //vel_bebop.angular.z = 0;
           //std::cout << "Pitch: " << pitch << " Yaw: " << yaw << "\n";
+          vel_bebop.linear.x = pitch;
+          vel_pub.publish(vel_bebop);
         }
-        vel_bebop.linear.x = pitch;
-        vel_bebop.angular.z = 0.0;  
-        vel_pub.publish(vel_bebop);
       }
       else{
         hover();
@@ -166,9 +181,9 @@ int main(int argc, char** argv){
   image_transport::ImageTransport it_(nh_);
   image_transport::Subscriber fake_image_sub_;
   VelocityHandle vh;
+  //ESTO LO HAGO PARA TRABAJAR SIN TENER QUE TENER EL BEBOP PRENDIDO TODO EL TIEMPO
   //fake_image_sub_ = it_.subscribe("/camera/image", 1, &VelocityHandle::fakeimgCallback, &vh);
   fake_image_sub_ = it_.subscribe("Processed_image", 1, &VelocityHandle::fakeimgCallback, &vh);
-  //ESTO LO HAGO PARA TRABAJAR SIN TENER QUE TENER EL BEBOP PRENDIDO TODO EL TIEMPO
   std::cout << "Menú:\nPresionar 't' para despegar\nPresionar 'l' para aterrizar\n";
   std::cout << "Presionar 's' para iniciar/terminar (el drone debe estár en el aire)\nPresionar 'esc' para salir\n";
   takeoff_pub = nh_.advertise<std_msgs::Empty>("/bebop/takeoff", 1000);

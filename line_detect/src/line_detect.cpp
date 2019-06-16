@@ -15,9 +15,17 @@
 #include <iostream>
 #include <stdlib.h>
 
+//USED FOR DEBUGS
+static const std::string OPENCV_ORIGINAL = "Original Image";
+static const std::string OPENCV_CROP = "Crop";
+static const std::string OPENCV_GRAY = "Gray";
+static const std::string OPENCV_BLUR = "Blur";
+static const std::string OPENCV_THRESH = "Thresh";
+static const std::string OPENCV_CONTOURS = "Contours";
+
 static const std::string OPENCV_WINDOW = "Image window";
 static const std::string OPENCV_BIN = "Binary Image";
-static const std::string OPENCV_TEST = "Image";
+
 
 using namespace cv;
 using namespace std;
@@ -28,7 +36,7 @@ geometry_msgs::Twist camera_msg;
 cv_bridge::CvImagePtr cv_ptr;
 
 ros::Publisher line_pos;
-//ros::Publisher camera_pub;
+ros::Publisher vcamera_pub;
 image_transport::Publisher camera_pub;
 
 RNG rng(12345);
@@ -54,55 +62,92 @@ public:
     }
 
     void detect_line(cv::Mat& img){
-      camera_msg.angular.y = -30;
-      //camera_pub.publish(camera_msg);
-      Mat processed_img;
-      vector<Mat> hsvChannels;
+      // ANTES DE EMPEZAR, MOVEMOS LA CÁMARA VIRTUAL 70 GRADOS EN PITCH, PARA ASEGURAR QUE EL DRONE VE EL PISO
+      camera_msg.angular.y = -70;
+      vcamera_pub.publish(camera_msg);
+      // DECLARACIÓN DE VARIABLES NECESARIAS
+      Mat processed_img, hsvImg, gray, blurr, edge, tresh, sobel, grad_x, grad_y, abs_grad_x, abs_grad_y, valueMask;
+      Mat draw = Mat::zeros(processed_img.size(), CV_8UC3);
       vector<vector<Point> > contours;
-      Mat hsvImg, gray, blurr, edge, tresh, sobel, grad_x, grad_y, abs_grad_x, abs_grad_y, valueMask;
       vector<Vec4i> lines, hierarchy;
       Point2f center;
+      //MENSAJE DE GEOMETRÍA CON LAS COORDENADAS DEL PUNTO DEL CENTROIDE (X, Y)
       geometry_msgs::Point mid_pos;
+      //VARIABLES NECESARIAS PARA CALCULAR EL CENTROIDE POR CON BASE EN LAS LINEAS 
       float radius;
       float x1=img.cols/2, y1=img.rows+1, x2=img.cols/2, y2=-1.0;
+      
+      //SE INICIALIZAN LAS COORDENADAS DEL CENTROIDE EN 0, ESTO PARA ASEGURAR QUE SE PUBLICA UN MENSAJE CON
+      //(0,0) SI EL PUNTO NO EXISTE O (X, Y) SI EL PUNTO EXISTE
       mid_pos.x= 0;
       mid_pos.y = 0;
+
+      //cv::imshow(OPENCV_ORIGINAL, img); //MOSTRAMOS LA IMAGEN ORIGINAL PARA REFERENCIA
+      
+      // == PRIMER PASO == PROCESAMIENTO DE LA IMAGEN
       //Recortamos la imagen para conseguir la región de interes
       img = img(Rect(308, 400, 200, 80));
-      //HSV
-      cvtColor(img, hsvImg, CV_BGR2RGB);
-      hsvImg = 255-hsvImg;
-      cvtColor(hsvImg, hsvImg, CV_RGB2BGR);
-      cvtColor(hsvImg, hsvImg, CV_BGR2HSV);
-      //img = 255-img;
-      //cvtColor(img, hsvImg, CV_BGR2GRAY);
-      
-      //threshold(hsvImg, processed_img, 180, 255, THRESH_BINARY_INV);
-      
-      //split(hsvImg, hsvChannels);
-      inRange(hsvImg, Scalar(0, 0, 0), Scalar(180, 255, 255), valueMask);
-      //bitwise_img
-      
-      bitwise_and(img, img, processed_img, valueMask);
-      
-      //Convirtiendo la imagen a escala de grises
-      //cvtColor(processed_img, gray, CV_BGR2GRAY);
-      //Aplicando filtro gaussiano
-      GaussianBlur(processed_img, blurr, Size(3, 3), 0, 0);
-      //GaussianBlur(valueMask, blurr, Size(3, 3), 0, 0);
-      //Detectando bordes con Canny
-      Canny(blurr, edge, 120, 180, 3);
-      //CONTOURS
-      findContours(edge, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+      cv::imshow(OPENCV_CROP, img); //MOSTRAMOS LA IMAGEN CON LA REGIÓN DE INTERES PARA REFERENCIA
+      /*
+      * PRESENTAMOS DOS FORMAS DE PROCESAR LA IMAGEN: 
+      * 1- POR MEDIO DE UMBRALIZACIÓN DE ESCALAS DE GRISES (MÁS EFICIENTE PARA ESTE TRABAJO)
+      * 2- POR MEDIO DE DISCRIMINACIÓN DE COLORES (MENOS EFICIENTE PARA ESTE TRABAJO, PERO EXTENDIBLE
+      *     PARA FUTUROS TRABAJOS, EN LOS CUALES SE IRÁ A REQUERIR DISCRIMINAR POR COLORES)
+      */
 
-      //HOUGH
-      //HoughLinesP(edge, lines, 1, CV_PI/180, 1, 3, 16);
-      //value mask
-      //Mat valueChannel = hsvChannels[2];
-      //Mat hueMask, saturationMask, valueMask;
+      //1 - POR MEDIO DE UMBRALIZACIÓN (ESTE METODO SE UTILIZARÁ PARA ESTE TRABAJO)
+      cvtColor(img, hsvImg, CV_BGR2GRAY); //CONVERTIMOS LA IMAGEN DE ENTRADA EN ESCALA DE GRISES
+      //cv::imshow(OPENCV_GRAY, hsvImg); //PARA REFERENCIA MOSTRAMOS LA IMAGEN CONVERTIDA A ESCALA DE GRISES
+
+      GaussianBlur(hsvImg, blurr, Size(3, 3), 0, 0); //APLICAMOS FILTRO GAUSSIANO PARA ELIMINAR RUIDO
+      //cv::imshow(OPENCV_BLUR, blurr); //MOSTRAMOS LA IMAGEN PROCESADA CON EL FILTRO PARA REFERENCIA
+
+      //APLICAMOS EL UMBRAL, PARA NEGRO EL RANGO IDEAL ES ~60, THRESH_BINARY_INV INDICA QUE VALORES TOMARÁ
+      //LA NUEVA IMAGEN: 0 SI src(x, y)>thresh; 255 de lo contrario
+      threshold(blurr, processed_img, 90, 255, THRESH_BINARY_INV); 
+      //cv::imshow(OPENCV_THRESH, processed_img); //MOSTRAMOS LA IMAGEN UMBRALIZADA CON PARA REFERENCIA
+
+      //2 - POR MEDIO DE DISCRIMINACIÓN DE COLORES
+      /*cvtColor(hsvImg, hsvImg, CV_BGR2HSV); //CONVERTIMOS LA IMAGEN DE ENTRADA EN HSV
+      inRange(hsvImg, Scalar(0, 0, 0), Scalar(180, 255, 255), valueMask); //OBTENEMOS LA MÁSCARA SEGÚN EL RANGO DE VALORES
+      bitwise_and(img, img, processed_img, valueMask); //APLICAMOS LA MÁSCARA A LA IMAGEN ORIGINAL, ELIMINANDO LOS PIXELES QUE NO INTERESAN
+      //GaussianBlur(processed_img, blurr, Size(3, 3), 0, 0); //APLICAMOS FILTRO GAUSSIANO
+      //Canny(blurr, edge, 120, 180, 3); //RESALTAMOS BORDES CON CANNY
+      */
+      
+      //OBTENEMOS LOS CONTORNOS DE LA IMAGEN
+      findContours(processed_img, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+      
+      //OBTENEMOS EL CENTROIDE POR MEIDO DE LOS MOMENTOS DE HU
+      vector<Moments> mu(contours.size());
+      vector<Point2f> mc(contours.size());
+
+      for(int i = 0; i<contours.size(); i++){
+        mu[i]=moments(contours[i], false);
+      }
+
+      for(int i=0; i<contours.size(); i++){
+        mc[i]=Point2f((mu[i].m10/(mu[i].m00)), (mu[i].m01/(mu[i].m00)));
+      }
+      if(mc.size()>0){
+        //std::cout << mc[0] << "\n";
+        mid_pos.x = mc[0].x;
+        mid_pos.y = mc[0].y;
+      }
+      for(int i =0; i<contours.size(); i++){
+        Scalar color = Scalar(rng.uniform(0, 255), rng.uniform(0, 255), rng.uniform(0, 255));
+        //drawContours(draw, contours, i, color, 2);
+        circle(processed_img, mc[i], 4, color, -1);
+      }
       
       //DRAW CONTOURS:
-      Mat draw = Mat::zeros(edge.size(), CV_8UC3);
+      /*
+      *
+      * ESTE SEGMENTO ES UTILIZADO PARA CALCULAR EL CENTROIDE CON BASE EN LAS LINEAS, TOMANDO EL PUNTO DE Y MÁS
+      * ALTO Y EL PUNTO DE Y MÁS BAJO, Y SUS VALORES DE X ASOCIADOS, CALCULAMOS EL PUNTO INTERMEDIO
+      * 
+      * /
+      /*Mat draw = Mat::zeros(edge.size(), CV_8UC3);
       if(contours.size() > 0){
         for(int i=0; i<contours.size(); i++){
           minEnclosingCircle(contours[i], center, radius);
@@ -117,28 +162,22 @@ public:
           Scalar color = Scalar(rng.uniform(0, 255), rng.uniform(0, 255), rng.uniform(0, 255));
           drawContours(draw, contours, i, color, 2, 8, hierarchy, 0, Point());
         }
-        mid_pos.x = (center.x+x2)/2;
-        mid_pos.y = (center.y+y2)/2;
-        //std::cout<<"DETECTED CENTER:";
-        //std::cout<<center<<std::endl;
-        //std::cout<<"CALCULATED ONE:";
-        //std::cout<<Point(x1, y1)<<std::endl;
-        //std::cout<<"CALCULATED TWO:";
-        //std::cout<<Point(x2, y2)<<std::endl;
-        //std::cout<< "WIDTH : " << processed_img.cols << " HEIGHT: " << processed_img.rows << "\n";
+        mid_pos.x = (x1+x2)/2;
+        mid_pos.y = (y1+y2)/2;
         circle(processed_img, Point((center.x+x2)/2, (center.y+y2)/2), 5, (0, 255, 200), 2);
         circle(img, Point(x2, y2), 5, (0, 0, 255), 1);
-      }
+      }*/
+
+      //PUBLICAMOS LOS MENSAJES RELEVANTES (POSICIÓN DE CENTROIDE, IMAGEN PROCESADA) Y MOSTRAMOS LA IMAGEN PROCESADA
       line_pos.publish(mid_pos);
       cv_bridge::CvImage img_bridge;
       sensor_msgs::Image img_msg;
       std_msgs::Header header;
+      cvtColor(processed_img, processed_img, CV_GRAY2BGR);
       img_bridge = cv_bridge::CvImage(header, sensor_msgs::image_encodings::RGB8, processed_img);
       img_bridge.toImageMsg(img_msg);
       camera_pub.publish(img_msg);
-      //std::cout << processed_img.cols << std::endl;
-      //cv::imshow(OPENCV_TEST, img);
-      cv::imshow(OPENCV_WINDOW, draw);
+      //cv::imshow(OPENCV_WINDOW, draw);
       cv::imshow(OPENCV_BIN, processed_img);
     }
 
@@ -166,9 +205,10 @@ int main(int argc, char** argv){
   image_transport::ImageTransport it_(nh_);
   image_transport::Subscriber image_sub_;
   ImageProcess ip;
-  //image_sub_ = it_.subscribe("/bebop/image_raw", 1, &ImageProcess::imageCallback, &ip);
+  image_sub_ = it_.subscribe("/bebop/image_raw", 1, &ImageProcess::imageCallback, &ip);
+  vcamera_pub = nh_.advertise<geometry_msgs::Twist>("/bebop/camera_control", 1000);
   //ESTO LO HAGO PARA TRABAJAR SIN TENER QUE TENER EL BEBOP PRENDIDO TODO EL TIEMPO
-  image_sub_ = it_.subscribe("/camera/image", 1, &ImageProcess::imageCallback, &ip);
+  //image_sub_ = it_.subscribe("/camera/image", 1, &ImageProcess::imageCallback, &ip);
 
   while(nh_.ok()){
     ros::spinOnce();
