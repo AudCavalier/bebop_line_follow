@@ -67,7 +67,7 @@ public:
       vcamera_pub.publish(camera_msg);
       // DECLARACIÓN DE VARIABLES NECESARIAS
       Mat processed_img, hsvImg, gray, blurr, edge, tresh, sobel, grad_x, grad_y, abs_grad_x, abs_grad_y, valueMask;
-      Mat draw = Mat::zeros(processed_img.size(), CV_8UC3);
+      
       vector<vector<Point> > contours;
       vector<Vec4i> lines, hierarchy;
       Point2f center;
@@ -96,49 +96,60 @@ public:
       */
 
       //1 - POR MEDIO DE UMBRALIZACIÓN (ESTE METODO SE UTILIZARÁ PARA ESTE TRABAJO)
-      cvtColor(img, hsvImg, CV_BGR2GRAY); //CONVERTIMOS LA IMAGEN DE ENTRADA EN ESCALA DE GRISES
+      //cvtColor(img, hsvImg, CV_BGR2GRAY); //CONVERTIMOS LA IMAGEN DE ENTRADA EN ESCALA DE GRISES
       //cv::imshow(OPENCV_GRAY, hsvImg); //PARA REFERENCIA MOSTRAMOS LA IMAGEN CONVERTIDA A ESCALA DE GRISES
 
-      GaussianBlur(hsvImg, blurr, Size(3, 3), 0, 0); //APLICAMOS FILTRO GAUSSIANO PARA ELIMINAR RUIDO
+      //GaussianBlur(hsvImg, blurr, Size(3, 3), 0, 0); //APLICAMOS FILTRO GAUSSIANO PARA ELIMINAR RUIDO
       //cv::imshow(OPENCV_BLUR, blurr); //MOSTRAMOS LA IMAGEN PROCESADA CON EL FILTRO PARA REFERENCIA
 
       //APLICAMOS EL UMBRAL, PARA NEGRO EL RANGO IDEAL ES ~60, THRESH_BINARY_INV INDICA QUE VALORES TOMARÁ
       //LA NUEVA IMAGEN: 0 SI src(x, y)>thresh; 255 de lo contrario
-      threshold(blurr, processed_img, 90, 255, THRESH_BINARY_INV); 
+      //threshold(hsvImg, processed_img, 100, 255, THRESH_BINARY_INV); 
       //cv::imshow(OPENCV_THRESH, processed_img); //MOSTRAMOS LA IMAGEN UMBRALIZADA CON PARA REFERENCIA
 
       //2 - POR MEDIO DE DISCRIMINACIÓN DE COLORES
-      /*cvtColor(hsvImg, hsvImg, CV_BGR2HSV); //CONVERTIMOS LA IMAGEN DE ENTRADA EN HSV
-      inRange(hsvImg, Scalar(0, 0, 0), Scalar(180, 255, 255), valueMask); //OBTENEMOS LA MÁSCARA SEGÚN EL RANGO DE VALORES
+      cvtColor(img, hsvImg, CV_BGR2HSV); //CONVERTIMOS LA IMAGEN DE ENTRADA EN HSV
+      //hsvImg = ~hsvImg;
+      inRange(hsvImg, Scalar(0, 0, 128), Scalar(255, 255, 255), valueMask); //OBTENEMOS LA MÁSCARA SEGÚN EL RANGO DE VALORES
       bitwise_and(img, img, processed_img, valueMask); //APLICAMOS LA MÁSCARA A LA IMAGEN ORIGINAL, ELIMINANDO LOS PIXELES QUE NO INTERESAN
       //GaussianBlur(processed_img, blurr, Size(3, 3), 0, 0); //APLICAMOS FILTRO GAUSSIANO
       //Canny(blurr, edge, 120, 180, 3); //RESALTAMOS BORDES CON CANNY
-      */
-      
+      threshold(processed_img, processed_img, 60, 255, THRESH_BINARY_INV);
+      cvtColor(processed_img, processed_img, CV_BGR2GRAY);
+      cv::imshow(OPENCV_THRESH, processed_img);
       //OBTENEMOS LOS CONTORNOS DE LA IMAGEN
-      findContours(processed_img, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+      //findContours(processed_img, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
       
       //OBTENEMOS EL CENTROIDE POR MEIDO DE LOS MOMENTOS DE HU
+      /*
       vector<Moments> mu(contours.size());
       vector<Point2f> mc(contours.size());
-
+      Mat draw = Mat::zeros(processed_img.size(), CV_8UC3);
       for(int i = 0; i<contours.size(); i++){
         mu[i]=moments(contours[i], false);
       }
+      */
+      Moments mu;
+      Point2f mc;
+      //Mat draw = Mat::zeros(processed_img.size(), CV_8UC3);
+      mu=moments(processed_img, false);
+      
+      mc=Point2f((mu.m10/(mu.m00)), (mu.m01/(mu.m00)));
+      
+      mid_pos.x = mc.x;
+      mid_pos.y = mc.y;
 
-      for(int i=0; i<contours.size(); i++){
-        mc[i]=Point2f((mu[i].m10/(mu[i].m00)), (mu[i].m01/(mu[i].m00)));
-      }
-      if(mc.size()>0){
+      circle(processed_img, mc, 4, Scalar(0, 0, 0), -1);
+      //if(mc.size()>0){
         //std::cout << mc[0] << "\n";
-        mid_pos.x = mc[0].x;
-        mid_pos.y = mc[0].y;
-      }
-      for(int i =0; i<contours.size(); i++){
-        Scalar color = Scalar(rng.uniform(0, 255), rng.uniform(0, 255), rng.uniform(0, 255));
+        //mid_pos.x = mc[0].x;
+       // mid_pos.y = mc[0].y;
+      //}
+      //for(int i =0; i<contours.size(); i++){
+      //  Scalar color = Scalar(rng.uniform(0, 255), rng.uniform(0, 255), rng.uniform(0, 255));
         //drawContours(draw, contours, i, color, 2);
-        circle(processed_img, mc[i], 4, color, -1);
-      }
+      //  circle(processed_img, mc[i], 4, color, -1);
+      //}
       
       //DRAW CONTOURS:
       /*
@@ -149,7 +160,7 @@ public:
       * /
       /*Mat draw = Mat::zeros(edge.size(), CV_8UC3);
       if(contours.size() > 0){
-        for(int i=0; i<contours.size(); i++){
+        for(int i=0; i<contours.size(); i++){CV_GRAY2BGR
           minEnclosingCircle(contours[i], center, radius);
           if(center.y<y1){
             y1=center.y;
@@ -173,8 +184,8 @@ public:
       cv_bridge::CvImage img_bridge;
       sensor_msgs::Image img_msg;
       std_msgs::Header header;
-      cvtColor(processed_img, processed_img, CV_GRAY2BGR);
-      img_bridge = cv_bridge::CvImage(header, sensor_msgs::image_encodings::RGB8, processed_img);
+      //cvtColor(processed_img, processed_img, CV_GRAY2BGR);
+      img_bridge = cv_bridge::CvImage(header, sensor_msgs::image_encodings::RGB8, img);
       img_bridge.toImageMsg(img_msg);
       camera_pub.publish(img_msg);
       //cv::imshow(OPENCV_WINDOW, draw);
