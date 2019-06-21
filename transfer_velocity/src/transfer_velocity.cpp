@@ -34,9 +34,9 @@ ros::Subscriber sub; //para subscribirse al tópico del punto
 ros::Subscriber img;
 
 Point2f bebop_center;
-bool end_flag = false;
+bool end_flag = false, turned=false;
 int can_move = 0; //variable para indicar que el bebop empezará a moverse(1) o no (0)
-
+float speed_gradient = 0.02;
 class VelocityHandle{  
 public:
   VelocityHandle(){
@@ -69,15 +69,14 @@ public:
     void velHandle(const geometry_msgs::Point &msg){
       int y_point = msg.y;
       int x_point = msg.x;
-      float pitch = 0.0, yaw = 0.0;
-      //std::cout << "DEBUG MSG : ==================== " << msg << std::endl;
+      //std::cout << "DEBUG MSG : ==================== " << mscalccenterg << std::endl;
       //std::cout << "DEBUG: X POINT: " << x_point << " Y POINT: " << y_point << "\n";
       if(can_move){
         if(x_point>0 &&  y_point>0){
           //Recordatorio personal. angular.z >0 contrario a las manecillas
           //angular.z <0 en sentido de las manecillas del reloj
-          if(x_point < bebop_center.x-40){
-            if(y_point>bebop_center.y-5 && y_point < bebop_center.y+5){
+          if(x_point < bebop_center.x-60){
+            if(y_point>bebop_center.y-(bebop_center.y/8) && y_point < bebop_center.y){
               std::cout << "DEBUG : : MOVING LEFT : :" << "\n";//x_point << " :: " << bebop_center << "\n";
               vel_bebop.linear.x = 0;
               vel_bebop.linear.y = 0.02;
@@ -85,14 +84,20 @@ public:
               vel_bebop.angular.z = 0.0;
             }else{
               std::cout << "DEBUG : : TURNING LEFT : :" << msg << " :: " << bebop_center << "\n";
-              vel_bebop.linear.x = 0;
+              vel_bebop.linear.x = 0.0;
               vel_bebop.linear.y = 0;
               vel_bebop.linear.z = 0;
-              vel_bebop.angular.z = 0.2;
-            }
+              vel_bebop.angular.z = 0.1;
+              turned = true;
+            }/*
+            std::cout << "DEBUG : : TURNING LEFT : :" << msg << " :: " << bebop_center << "\n";
+            vel_bebop.linear.x = 0;
+            vel_bebop.linear.y = 0;
+            vel_bebop.linear.z = 0;
+            vel_bebop.angular.z = 0.12;*/
           }
-          else if(x_point > bebop_center.x+40){
-             if(y_point>bebop_center.y-5 && y_point < bebop_center.y+5){
+          else if(x_point > bebop_center.x+60){
+             if(y_point>bebop_center.y-(bebop_center.y/8) && y_point < bebop_center.y){
               std::cout << "DEBUG : : MOVING RIGHT : :" << "\n";//x_point << " :: " << bebop_center << "\n";
               vel_bebop.linear.x = 0;
               vel_bebop.linear.y = -0.02;
@@ -100,26 +105,41 @@ public:
               vel_bebop.angular.z = 0.0;
             }else{
               std::cout << "DEBUG : : TURNING RIGHT : :" << msg << " :: " << bebop_center << "\n";
-              vel_bebop.linear.x = 0;
+              vel_bebop.linear.x = 0.0;
               vel_bebop.linear.y = 0;
               vel_bebop.linear.z = 0;
-              vel_bebop.angular.z = -0.2;
+              vel_bebop.angular.z = -0.1;
+              turned = true;
+            }
+            /*std::cout << "DEBUG : : TURNING RIGHT : :" << msg << " :: " << bebop_center << "\n";
+            vel_bebop.linear.x = 0;
+            vel_bebop.linear.y = 0;
+            vel_bebop.linear.z = 0;
+            vel_bebop.angular.z = -0.12;*/
+          }
+          else{
+            if(y_point>bebop_center.y+(bebop_center.y/2)){
+              std::cout << "MOVING BACK\n";
+              std::cout << y_point << "\n";
+              vel_bebop.linear.x = -0.02;
+              vel_bebop.linear.y = 0.0;
+              vel_bebop.linear.z = 0;
+              vel_bebop.angular.z = 0.0;
+            }else{
+              std::cout << "MOVING FORWARD ";
+              std::cout << y_point << "\n";
+              //std::cout << " Z VEL: " << vel_bebop.linear.z << " ANGULAR: ";
+              //std::cout << vel_bebop.angular.z << "\n";
+              vel_bebop.linear.x = 0.025;
+              vel_bebop.linear.y = 0.0;
+              vel_bebop.linear.z = 0;
+              vel_bebop.angular.z = 0.0;
             }
           }
-          else if(y_point > bebop_center.y-(bebop_center.y/4)){
-            //std::cout << "MOVING FORWARD";
-            //std::cout << " X VEL: " << vel_bebop.linear.x << "\n Y VEL: " <<  vel_bebop.linear.y;
-            //std::cout << " Z VEL: " << vel_bebop.linear.z << " ANGULAR: ";
-            //std::cout << vel_bebop.angular.z << "\n";
-            vel_bebop.linear.y = 0.0;
-            vel_bebop.angular.z = 0.0;  
-            pitch = 0.018;
-          }else{
-            vel_bebop.angular.z = 0.0;
-          }
+          std::cout << " X VEL: " << vel_bebop.linear.x << "\n Y VEL: " << vel_bebop.linear.y << "\n";
+          std::cout << " Z VEL: " << vel_bebop.linear.z << "\n ANGULAR: " << vel_bebop.angular.z << "\n";
+              
           //vel_bebop.angular.z = 0;
-          //std::cout << "Pitch: " << pitch << " Yaw: " << yaw << "\n";
-          vel_bebop.linear.x = pitch;
           vel_pub.publish(vel_bebop);
         }else{
           hover();

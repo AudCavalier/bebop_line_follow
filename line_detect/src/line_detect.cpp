@@ -63,7 +63,7 @@ public:
 
     void detect_line(cv::Mat& img){
       // ANTES DE EMPEZAR, MOVEMOS LA CÁMARA VIRTUAL 70 GRADOS EN PITCH, PARA ASEGURAR QUE EL DRONE VE EL PISO
-      camera_msg.angular.y = -70;
+      camera_msg.angular.y = -40;
       vcamera_pub.publish(camera_msg);
       // DECLARACIÓN DE VARIABLES NECESARIAS
       Mat processed_img, hsvImg, gray, blurr, edge, tresh, sobel, grad_x, grad_y, abs_grad_x, abs_grad_y, valueMask;
